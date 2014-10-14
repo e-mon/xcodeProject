@@ -11,18 +11,18 @@ import UIKit
 class SearchResultViewController: UIViewController,UITableViewDataSource,UITableViewDelegate,APIControllerProtocol {
     let kCellIdentifier: String = "SearchResultCell"
     var tableData = []
-    var api = APIController()
+    var api:APIController?
     var imageCache = [String : UIImage]()
+    var albums = [Album]()
     
     @IBOutlet weak var appsTableView: UITableView!
     
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
-
-        api.searchItunesFor("Angry Birds")
-        self.api.delegate = self
-
+        api = APIController(delegate: self)
+        UIApplication.sharedApplication().networkActivityIndicatorVisible = true
+        api!.searchItunesFor("Beatles")
     }
 
     override func didReceiveMemoryWarning() {
@@ -30,38 +30,29 @@ class SearchResultViewController: UIViewController,UITableViewDataSource,UITable
         // Dispose of any resources that can be recreated.
     }
     
-    func tableView(tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return tableData.count
+    override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
+        var detailsViewController: DetailsViewController = segue.destinationViewController as DetailsViewController
+        var albumIndex = appsTableView!.indexPathForSelectedRow()!.row
+        var selectedAlbum = self.albums[albumIndex]
+        detailsViewController.album = selectedAlbum
     }
     
-    func tableView(tableView: UITableView,didSelectRowAtIndexPath indexPath:NSIndexPath){
-        var rowData:NSDictionary = self.tableData[indexPath.row] as NSDictionary
-        
-        var name:String = rowData["trackName"] as String
-        var formattedPrice:String = rowData["formattedPrice"] as String
-        
-        var alert:UIAlertView = UIAlertView()
-        alert.title = name
-        alert.message = formattedPrice
-        alert.addButtonWithTitle("OK")
-        alert.show()
-        
+    func tableView(tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        return albums.count
     }
     
     func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
         let cell: UITableViewCell = tableView.dequeueReusableCellWithIdentifier(kCellIdentifier) as UITableViewCell
         
-        let rowData: NSDictionary = self.tableData[indexPath.row] as NSDictionary
-        
-        let cellText:String? = rowData["trackName"] as? String
-        cell.textLabel?.text = cellText
+        let album = self.albums[indexPath.row]
+        cell.textLabel?.text = album.title
         cell.imageView?.image = UIImage(named: "Blank52")
         
         // Grab the artworkUrl60 key to get an image URL for the app's thumbnail
-        let urlString: NSString = rowData["artworkUrl60"] as NSString
+        let urlString: NSString = album.thumbnailImageURL
         
         // Get the formatted price string for display in the subtitle
-        let formattedPrice: NSString = rowData["formattedPrice"] as NSString
+        let formattedPrice: NSString = album.price
         
         cell.detailTextLabel?.text = formattedPrice
         
@@ -87,13 +78,13 @@ class SearchResultViewController: UIViewController,UITableViewDataSource,UITable
                 }
             })
         }
-        //else{
+        else{
             dispatch_async(dispatch_get_main_queue(), {
                 if let cellToUpdate = tableView.cellForRowAtIndexPath(indexPath){
                     cellToUpdate.imageView?.image = image
                 }
             })
-     //   }
+        }
         return cell
     }
     
@@ -101,8 +92,9 @@ class SearchResultViewController: UIViewController,UITableViewDataSource,UITable
     func didReceiveAPIResults(results: NSDictionary){
         var resultsArr: NSArray = results["results"] as NSArray
         dispatch_async(dispatch_get_main_queue(),{
-            self.tableData = resultsArr
+            self.albums = Album.albumsWithJSON(resultsArr)
             self.appsTableView!.reloadData()
+            UIApplication.sharedApplication().networkActivityIndicatorVisible = false
         })
     }
 }
