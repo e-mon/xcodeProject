@@ -12,7 +12,10 @@ class SearchResultViewController: UIViewController,UITableViewDataSource,UITable
     let kCellIdentifier: String = "SearchResultCell"
     var tableData = []
     var api = APIController()
+    var imageCache = [String : UIImage]()
+    
     @IBOutlet weak var appsTableView: UITableView!
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
@@ -50,21 +53,47 @@ class SearchResultViewController: UIViewController,UITableViewDataSource,UITable
         
         let rowData: NSDictionary = self.tableData[indexPath.row] as NSDictionary
         
-        cell.textLabel?.text = rowData["trackName"] as? String
+        let cellText:String? = rowData["trackName"] as? String
+        cell.textLabel?.text = cellText
+        cell.imageView?.image = UIImage(named: "Blank52")
         
         // Grab the artworkUrl60 key to get an image URL for the app's thumbnail
         let urlString: NSString = rowData["artworkUrl60"] as NSString
-        let imgURL: NSURL = NSURL(string: urlString)
-        
-        // Download an NSData representation of the image at the URL
-        let imgData: NSData = NSData(contentsOfURL: imgURL)
-        cell.imageView?.image = UIImage(data: imgData)
         
         // Get the formatted price string for display in the subtitle
         let formattedPrice: NSString = rowData["formattedPrice"] as NSString
         
         cell.detailTextLabel?.text = formattedPrice
         
+        var image = self.imageCache[urlString]
+        
+        if(image == nil){
+            var imgURL: NSURL = NSURL(string: urlString)
+            
+            let request: NSURLRequest = NSURLRequest(URL: imgURL)
+            NSURLConnection.sendAsynchronousRequest(request, queue: NSOperationQueue.mainQueue(), completionHandler: {(response: NSURLResponse!,data: NSData!,error: NSError!) -> Void in
+                if error == nil{
+                    image = UIImage(data: data)
+                
+                    self.imageCache[urlString] = image
+                    dispatch_async(dispatch_get_main_queue(), {
+                        if let cellToUpdate = tableView.cellForRowAtIndexPath(indexPath){
+                            cellToUpdate.imageView?.image = image
+                        }
+                    })
+                }
+                else{
+                    println("Error: \(error.localizedDescription)")
+                }
+            })
+        }
+        //else{
+            dispatch_async(dispatch_get_main_queue(), {
+                if let cellToUpdate = tableView.cellForRowAtIndexPath(indexPath){
+                    cellToUpdate.imageView?.image = image
+                }
+            })
+     //   }
         return cell
     }
     
